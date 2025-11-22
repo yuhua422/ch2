@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>造句語詞排列練習</title>
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Inter 字體 -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .draggable {
+            cursor: grab;
+            transition: transform 0.1s;
+        }
+        .drop-area-placeholder {
+            min-height: 4rem;
+            border: 2px dashed #a0aec0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #718096;
+            padding: 0.5rem;
+        }
+        /* 實際語詞塊樣式 */
+        .word-token {
+             background-color: #e0f2fe; /* Light Blue */
+             color: #0c4a6e; /* Dark Blue */
+             border: 2px solid #38bdf8; /* Sky Blue */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- 主應用程式容器 -->
+    <div id="app-container" class="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-6 md:p-10 transition-all duration-300">
+        <h1 class="text-3xl font-bold text-center text-blue-700 mb-8">造句語詞排列練習</h1>
+
+        <!-- 1. 設定頁面 -->
+        <div id="setup-page" class="page">
+            <div class="space-y-6">
+                <!-- 選擇課數 -->
+                <div>
+                    <label for="lesson-select" class="block text-sm font-medium text-gray-700 mb-2">選擇課數</label>
+                    <select id="lesson-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                        <option value="">請選擇課數...</option>
+                    </select>
+                </div>
+                <!-- 選擇句型 -->
+                <div>
+                    <label for="pattern-select" class="block text-sm font-medium text-gray-700 mb-2">選擇句型</label>
+                    <select id="pattern-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150" disabled>
+                        <option value="">請先選擇課數</option>
+                    </select>
+                </div>
+                <!-- 練習題數 -->
+                <div>
+                    <label for="question-count" class="block text-sm font-medium text-gray-700 mb-2">練習題數 (練習題為範例造句)</label>
+                    <select id="question-count" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150" disabled>
+                        <option value="1">1 題</option>
+                        <option value="2" selected>2 題</option>
+                        <option value="3">3 題</option>
+                    </select>
+                </div>
+                <!-- 錯誤訊息 -->
+                <p id="error-message" class="text-red-500 text-sm h-5"></p>
+
+                <!-- 開始練習按鈕 -->
+                <button id="start-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow-lg transition duration-200 disabled:opacity-50" disabled>
+                    開始練習
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. 練習頁面 -->
+        <div id="practice-page" class="page hidden">
+            <div class="text-center mb-6">
+                <span id="question-counter" class="text-xl font-semibold text-gray-600"></span>
+            </div>
+
+            <!-- 句型結構提示 -->
+            <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-6 rounded-lg">
+                <p class="font-bold text-indigo-800 mb-1">句型結構：</p>
+                <p id="pattern-structure" class="text-indigo-700 text-lg font-medium mb-3 border-b border-indigo-200 pb-2"></p> 
+                
+                <p class="font-bold text-indigo-800 mb-1">說明：</p>
+                <p id="pattern-description" class="text-sm text-indigo-600"></p>
+            </div>
+            
+            <!-- 語詞放置區 (使用者排列語詞) -->
+            <div id="drop-area" class="drop-area-placeholder rounded-lg bg-gray-100 mb-6 flex flex-wrap gap-3 min-h-[5rem]">
+                <span class="text-gray-500">請依正確順序排列語詞</span>
+            </div>
+
+            <div class="flex flex-col space-y-3 mb-6">
+                <!-- 清除重排按鈕 -->
+                <button id="clear-button" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 px-4 rounded-lg transition duration-200">
+                    清除重排
+                </button>
+            </div>
+
+            <!-- 語詞區 (亂序的語詞塊) -->
+            <div id="word-bank" class="bg-white p-4 border border-dashed border-gray-300 rounded-lg flex flex-wrap gap-3 justify-center">
+                <!-- 語詞按鈕會在這裡動態生成 -->
+            </div>
+
+            <!-- 提交/下一題按鈕 -->
+            <button id="submit-next-button" class="w-full mt-8 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-lg transition duration-200">
+                送出答案
+            </button>
+            
+            <!-- 結果回饋 -->
+            <div id="feedback-area" class="mt-4 text-center text-lg font-semibold h-6"></div>
+        </div>
+
+        <!-- 3. 結果頁面 -->
+        <div id="result-page" class="page hidden">
+            <div class="text-center p-6 bg-green-50 rounded-lg mb-8">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-green-500 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h2 class="text-2xl font-bold text-green-700">恭喜您完成練習！</h2>
+                <p id="final-score" class="text-xl text-gray-600 mt-2"></p>
+            </div>
+
+            <h3 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">本次練習回顧：</h3>
+            <div id="review-list" class="space-y-4">
+                <!-- 複習列表會在這裡動態生成 -->
+            </div>
+
+            <!-- 返回按鈕 -->
+            <button id="restart-button" class="w-full mt-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow-lg transition duration-200">
+                重新開始
+            </button>
+        </div>
+
+    </div>
+
+    <!-- 語音播放器 -->
+    <audio id="tts-audio" class="hidden"></audio>
+
+<script>
+    // Firebase 相關配置和 API 密鑰 (保持為空字串，由 Canvas 環境提供)
+    const apiKey = ""; 
+    // TTS Model
+    const ttsModel = "gemini-2.5-flash-preview-tts";
+    const ttsApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${ttsModel}:generateContent?key=${apiKey}`;
+    const ttsVoice = "Kore"; // 選擇一個聲音
+
+    // --------------------------------------------------
+    // 1. 數據結構 (Data Model) - 每個 example 增加明確的 words 陣列
+    // --------------------------------------------------
+
+    // 原始課文數據 (移除短語練習，只保留造句/句型)
+    const LESSON_DATA = [
+        // ------------------ 第七課 ------------------
+        {
+            lesson: "第七課：不一樣的美食",
+            id: 'L07',
+            patterns: [
+                {
+                    name: "造句：你怎麼帶竹筒來?",
+                    id: 'L07-P2',
+                    structure: "名詞(人或物) + 怎麼 + 動詞(做什麼事)?",
+                    desc: "加上「怎麼」變成疑問句。",
+                    examples: [
+                        { sentence: "哥哥怎麼還沒來?", words: ["哥哥", "怎麼", "還沒來", "?"] },
+                        { sentence: "小貓怎麼跑走了?", words: ["小貓", "怎麼", "跑走了", "?"] },
+                        { sentence: "老師怎麼還沒到?", words: ["老師", "怎麼", "還沒到", "?"] },
+                    ]
+                },
+                {
+                    name: "句型：有...有...還有...",
+                    id: 'L07-P3',
+                    structure: "有...有...還有...",
+                    desc: "表達事物包含了三個特別的地方。",
+                    examples: [
+                        { sentence: "蛋糕上，有酸酸的草莓，有甜甜的水蜜桃，還有香香的巧克力。", words: ["蛋糕上", "，", "有", "酸酸的草莓", "，", "有", "甜甜的水蜜桃", "，", "還有", "香香的巧克力", "。"] },
+                        { sentence: "公園裡，有五顏六色的花朵，有飛來飛去的蝴蝶，還有好玩的盪秋千。", words: ["公園裡", "，", "有", "五顏六色的花朵", "，", "有", "飛來飛去的蝴蝶", "，", "還有", "好玩的盪秋千", "。"] },
+                        { sentence: "我的書包裡，有厚厚的課本，有漂亮的鉛筆盒，還有心愛的玩具。", words: ["我的書包裡", "，", "有", "厚厚的課本", "，", "有", "漂亮的鉛筆盒", "，", "還有", "心愛的玩具", "。"] },
+                    ]
+                },
+                {
+                    name: "句型：不但...還可以...",
+                    id: 'L07-P4',
+                    structure: "不但...還可以...",
+                    desc: "強調事物有兩個特別的地方。",
+                    examples: [
+                        { sentence: "奶奶織的毛衣不但合身，還很保暖。", words: ["奶奶織的毛衣", "不但", "合身", "，", "還", "很保暖", "。"] },
+                        { sentence: "媽媽煮的義大利麵，不但放滿新鮮的蛤蜊，還有多汁的甜椒。", words: ["媽媽煮的義大利麵", "，", "不但", "放滿新鮮的蛤蜊", "，", "還有", "多汁的甜椒", "。"] },
+                        { sentence: "這件外套不但好看，還可以遮雨。", words: ["這件外套", "不但", "好看", "，", "還", "可以", "遮雨", "。"] },
+                    ]
+                }
+            ]
+        },
+        // ------------------ 第八課 ------------------
+        {
+            lesson: "第八課：美食分享日",
+            id: 'L08',
+            patterns: [
+                {
+                    name: "造句：一下子就...",
+                    id: 'L08-P2',
+                    structure: "一下子、一會兒、馬上 + 就...",
+                    desc: "表示速度很快。",
+                    examples: [
+                        { sentence: "夕陽一下子就消失了。", words: ["夕陽", "一下子", "就", "消失了", "。"] },
+                        { sentence: "哥哥一下子就完成作業。", words: ["哥哥", "一下子", "就", "完成作業", "。"] },
+                        { sentence: "他一會兒就睡著了。", words: ["他", "一會兒", "就", "睡著了", "。"] },
+                    ]
+                },
+                {
+                    name: "句型：一邊...一邊...",
+                    id: 'L08-P3',
+                    structure: "一邊 + 動詞 + 一邊 + 動詞",
+                    desc: "表示同時做了兩件事。",
+                    examples: [
+                        { sentence: "媽媽一邊聽音樂，一邊運動。", words: ["媽媽", "一邊", "聽音樂", "，", "一邊", "運動", "。"] },
+                        { sentence: "爺爺一邊釣魚，一邊聊天。", words: ["爺爺", "一邊", "釣魚", "，", "一邊", "聊天", "。"] },
+                        { sentence: "我一邊吃飯，一邊看電視。", words: ["我", "一邊", "吃飯", "，", "一邊", "看電視", "。"] },
+                    ]
+                },
+                {
+                    name: "句型：有了...更...",
+                    id: 'L08-P4',
+                    structure: "有了 + 新的事物，原本的事物 + 更 + 怎麼樣",
+                    desc: "強調事物會有更大的變化。",
+                    examples: [
+                        { sentence: "有了花朵，院子更美麗。", words: ["有了", "花朵", "，", "院子", "更", "美麗", "。"] },
+                        { sentence: "有了秋千，公園更好玩。", words: ["有了", "秋千", "，", "公園", "更", "好玩", "。"] },
+                        { sentence: "有了新衣服，妹妹更開心了。", words: ["有了", "新衣服", "，", "妹妹", "更", "開心了", "。"] },
+                    ]
+                }
+            ]
+        },
+        // ------------------ 第九課 ------------------
+        {
+            lesson: "第九課：好味道",
+            id: 'L09',
+            patterns: [
+                {
+                    name: "造句：我來點點名",
+                    id: 'L09-P2',
+                    structure: "名詞(人或物) + 來 + 疊字動詞 + 名詞(什麼事物)。",
+                    desc: "利用疊字詞來強調動作。",
+                    examples: [
+                        { sentence: "小鴨來玩玩水。", words: ["小鴨", "來", "玩玩", "水", "。"] },
+                        { sentence: "妹妹來唱唱歌。", words: ["妹妹", "來", "唱唱", "歌", "。"] },
+                        { sentence: "老師來走走看。", words: ["老師", "來", "走走", "看", "。"] },
+                    ]
+                }
+            ]
+        },
+        // ------------------ 第十課 ------------------
+        {
+            lesson: "第十課：加加減減",
+            id: 'L10',
+            patterns: [
+                {
+                    name: "造句：突然...",
+                    id: 'L10-P2',
+                    structure: "突然 + 發生什麼事",
+                    desc: "用「突然」強調沒有想到會這麼做。",
+                    examples: [
+                        { sentence: "不愛運動的姐姐突然說要參加馬拉松比賽。", words: ["不愛運動的姐姐", "突然", "說要", "參加", "馬拉松比賽", "。"] },
+                        { sentence: "溫度突然下降，好多人都感冒了。", words: ["溫度", "突然", "下降", "，", "好多人", "都", "感冒了", "。"] },
+                        { sentence: "天空突然下起大雨。", words: ["天空", "突然", "下起", "大雨", "。"] },
+                    ]
+                },
+                {
+                    name: "造句：異口同聲",
+                    id: 'L10-P3',
+                    structure: "異口同聲、一起、同時",
+                    desc: "表示在同一個時間裡做什麼。",
+                    examples: [
+                        { sentence: "我和妹妹聽到爺爺說要去公園，異口同聲的說：『我也要去。』", words: ["我和妹妹", "聽到", "爺爺", "說要", "去公園", "，", "異口同聲的說", "：", "『我也要去。』"] },
+                        { sentence: "大家異口同聲的請求舞臺上的歌手再來一首安可曲。", words: ["大家", "異口同聲的", "請求", "舞臺上的歌手", "再", "來一首", "安可曲", "。"] },
+                        { sentence: "同學異口同聲地回答了問題。", words: ["同學", "異口同聲地", "回答了", "問題", "。"] },
+                    ]
+                },
+                {
+                    name: "句型：...，可是...",
+                    id: 'L10-P4',
+                    structure: "名詞(誰) + 事件①，可是 + 事件②",
+                    desc: "當事件①和事件②的情況相反時，就用「可是」把兩件事合併在一起。",
+                    examples: [
+                        { sentence: "他說要認真複習功課，可是都在玩玩具。", words: ["他", "說要", "認真", "複習", "功課", "，", "可是", "都", "在玩", "玩具", "。"] },
+                        { sentence: "哥哥說好一起做家事，可是一張桌子都沒擦完。", words: ["哥哥", "說好", "一起", "做", "家事", "，", "可是", "一張", "桌子", "都沒", "擦完", "。"] },
+                        { sentence: "媽媽說要帶我去公園，可是外面下雨了。", words: ["媽媽", "說要", "帶我", "去公園", "，", "可是", "外面", "下雨了", "。"] },
+                    ]
+                }
+            ]
+        },
+        // ------------------ 第十一課 ------------------
+        {
+            lesson: "第十一課：奇怪的門",
+            id: 'L11',
+            patterns: [
+                {
+                    name: "造句：竟然...",
+                    id: 'L11-P2',
+                    structure: "竟然 + 發生什麼事",
+                    desc: "表達沒想到會發生這件事。",
+                    examples: [
+                        { sentence: "媽媽想買這家早餐店的早餐，想不到今天竟然休息。", words: ["媽媽", "想買", "這家", "早餐店的", "早餐", "，", "想不到", "今天", "竟然", "休息", "。"] },
+                        { sentence: "我記得那本書放在書架上，現在竟然找不到。", words: ["我", "記得", "那本書", "放在", "書架上", "，", "現在", "竟然", "找不到", "。"] },
+                        { sentence: "他竟然考了全班第一名！", words: ["他", "竟然", "考了", "全班", "第一名", "！"] },
+                    ]
+                },
+                {
+                    name: "句型：一...立刻...",
+                    id: 'L11-P3',
+                    structure: "一 + 動詞 + ，立刻 + 結果",
+                    desc: "表示「一」做什麼事，「立刻」有了什麼結果。",
+                    examples: [
+                        { sentence: "爸爸一進門，立刻去洗手。", words: ["爸爸", "一", "進門", "，", "立刻", "去洗手", "。"] },
+                        { sentence: "哥哥一寫完考卷，立刻仔細檢查。", words: ["哥哥", "一", "寫完", "考卷", "，", "立刻", "仔細", "檢查", "。"] },
+                        { sentence: "我一聽到鬧鐘響，立刻跳下床。", words: ["我", "一", "聽到", "鬧鐘", "響", "，", "立刻", "跳下床", "。"] },
+                    ]
+                }
+            ]
+        },
+        // ------------------ 第十二課 ------------------
+        {
+            lesson: "第十二課：詠鵝",
+            id: 'L12',
+            patterns: [
+                {
+                    name: "造句：...在...",
+                    id: 'L12-P2',
+                    structure: "名詞(人或物) + 動詞(動作) + 在 + 名詞(什麼地方)。",
+                    desc: "表達人或物在什麼地方的狀態。",
+                    examples: [
+                        { sentence: "雙腳泡在溪水中。", words: ["雙腳", "泡在", "溪水", "中", "。"] },
+                        { sentence: "奶奶走在人行道上。", words: ["奶奶", "走在", "人行道", "上", "。"] },
+                        { sentence: "書本放在桌子上。", words: ["書本", "放在", "桌子", "上", "。"] },
+                    ]
+                },
+                {
+                    name: "造句：變成...",
+                    id: 'L12-P3',
+                    structure: "名詞(誰) + 變成 + 名詞(什麼身分)!",
+                    desc: "強調什麼人有了特別的身分。",
+                    examples: [
+                        { sentence: "哥哥變成小畫家了！", words: ["哥哥", "變成", "小畫家", "了", "！"] },
+                        { sentence: "媽媽變成大廚師了！", words: ["媽媽", "變成", "大廚師", "了", "！"] },
+                        { sentence: "小狗變成大明星了！", words: ["小狗", "變成", "大明星", "了", "！"] },
+                    ]
+                },
+                {
+                    name: "句型：...才...",
+                    id: 'L12-P4',
+                    structure: "才 (只、只有) + 數量/時間",
+                    desc: "這裡的「才」，是「只」、「只有」的意思。",
+                    examples: [
+                        { sentence: "妹妹學會游泳的時候才三歲呢！", words: ["妹妹", "學會", "游泳", "的時候", "才", "三歲", "呢", "！"] },
+                        { sentence: "爸爸打掃客廳才花了一個小時呢！", words: ["爸爸", "打掃", "客廳", "才", "花了一個", "小時", "呢", "！"] },
+                        { sentence: "這件衣服才一百元呢！", words: ["這件", "衣服", "才", "一百元", "呢", "！"] },
+                    ]
+                },
+                {
+                    name: "句型：...，接著，...",
+                    id: 'L12-P5',
+                    structure: "事件①，接著，事件②",
+                    desc: "強調事件②是緊跟著事件①發生。",
+                    examples: [
+                        { sentence: "弟弟剛玩過雲霄飛車，接著玩碰碰車，玩得好開心。", words: ["弟弟", "剛玩過", "雲霄飛車", "，", "接著", "玩", "碰碰車", "，", "玩得", "好開心", "。"] },
+                        { sentence: "爸爸洗好米，接著炒青菜，忙著煮晚餐。", words: ["爸爸", "洗好", "米", "，", "接著", "炒", "青菜", "，", "忙著", "煮晚餐", "。"] },
+                        { sentence: "我寫完作業，接著去幫媽媽洗碗。", words: ["我", "寫完", "作業", "，", "接著", "去幫", "媽媽", "洗碗", "。"] },
+                    ]
+                }
+            ]
+        }
+    ];
+
+    // 應用程式狀態管理
+    let state = {
+        currentLessonId: null,
+        currentPatternId: null,
+        currentPattern: null,
+        questionCount: 2,
+        questions: [],          // 實際題目列表 (結構為 {sentence: string, words: Array<string>})
+        currentQuestionIndex: 0,
+        currentCorrectWords: [], // 當前範例句的正確語詞陣列
+        userAnswerWords: [],         // 用戶排列的語詞陣列
+        score: 0,
+        review: [],             // 複習列表 {sentence: string, correct: boolean}
+    };
+
+
+    // --------------------------------------------------
+    // 2. 應用程式流程控制 (App Flow)
+    // --------------------------------------------------
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // 初始填充課數選擇器
+        populateLessonSelect();
+
+        // 監聽事件
+        document.getElementById('lesson-select').addEventListener('change', handleLessonChange);
+        document.getElementById('pattern-select').addEventListener('change', handlePatternChange);
+        document.getElementById('start-button').addEventListener('click', startPractice);
+        document.getElementById('submit-next-button').addEventListener('click', handleSubmitOrNext);
+        document.getElementById('clear-button').addEventListener('click', clearDropArea);
+        document.getElementById('restart-button').addEventListener('click', showSetupPage);
+
+        // 處理詞語點擊事件監聽
+        document.getElementById('word-bank').addEventListener('click', handleWordClick);
+        document.getElementById('drop-area').addEventListener('click', handleDropAreaClick);
+
+        // 初始顯示設定頁
+        showSetupPage();
+    });
+
+    /**
+     * 隱藏所有頁面並顯示指定頁面
+     * @param {string} pageId - 要顯示的頁面 ID (例如 'setup-page')
+     */
+    function showPage(pageId) {
+        document.querySelectorAll('.page').forEach(page => {
+            page.classList.add('hidden');
+        });
+        document.getElementById(pageId).classList.remove('hidden');
+    }
+
+    /**
+     * 顯示設定頁面並重置狀態
+     */
+    function showSetupPage() {
+        // 重置狀態
+        state.currentLessonId = null;
+        state.currentPatternId = null;
+        state.currentPattern = null;
+        state.questions = [];
+        state.currentQuestionIndex = 0;
+        state.score = 0;
+        state.review = [];
+        
+        // 重置 UI
+        document.getElementById('lesson-select').value = "";
+        document.getElementById('pattern-select').value = "";
+        document.getElementById('pattern-select').disabled = true;
+        document.getElementById('question-count').disabled = true;
+        document.getElementById('start-button').disabled = true;
+        document.getElementById('error-message').textContent = "";
+        
+        showPage('setup-page');
+    }
+
+    /**
+     * 開始練習流程
+     */
+    function startPractice() {
+        if (!state.currentPattern || state.questionCount === 0) {
+            document.getElementById('error-message').textContent = "請選擇課數和句型。";
+            return;
+        }
+
+        // 1. 準備題目 (從範例中隨機選取，這次範例是物件 {sentence, words})
+        state.questions = generateQuestions(state.currentPattern.examples, state.questionCount);
+        state.currentQuestionIndex = 0;
+        state.score = 0;
+        state.review = [];
+
+        // 2. 顯示練習頁面
+        showPage('practice-page');
+        loadQuestion(state.currentQuestionIndex);
+    }
+
+    /**
+     * 處理提交答案或進入下一題
+     */
+    function handleSubmitOrNext() {
+        const button = document.getElementById('submit-next-button');
+        const isSubmit = button.textContent === '送出答案';
+        
+        if (isSubmit) {
+            checkAnswer();
+            
+            // 檢查是否還有下一題
+            if (state.currentQuestionIndex < state.questions.length - 1) {
+                button.textContent = '下一題';
+                button.classList.remove('bg-green-600', 'hover:bg-green-700');
+                button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            } else {
+                // 最後一題
+                button.textContent = '查看結果';
+                button.classList.remove('bg-green-600', 'hover:bg-green-700');
+                button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            }
+            
+        } else {
+            if (state.currentQuestionIndex < state.questions.length - 1) {
+                state.currentQuestionIndex++;
+                loadQuestion(state.currentQuestionIndex);
+                
+                // 重設按鈕為送出答案
+                button.textContent = '送出答案';
+                button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                button.classList.add('bg-green-600', 'hover:bg-green-700');
+                document.getElementById('feedback-area').textContent = '';
+            } else {
+                showResultPage();
+            }
+        }
+    }
+
+
+    // --------------------------------------------------
+    // 3. 畫面元件填充 (UI Population)
+    // --------------------------------------------------
+
+    /**
+     * 填充課數下拉選單
+     */
+    function populateLessonSelect() {
+        const select = document.getElementById('lesson-select');
+        LESSON_DATA.forEach(lesson => {
+            const option = document.createElement('option');
+            option.value = lesson.id;
+            option.textContent = lesson.lesson;
+            select.appendChild(option);
+        });
+    }
+
+    /**
+     * 處理課數變動，填充句型選單
+     */
+    function handleLessonChange(event) {
+        state.currentLessonId = event.target.value;
+        state.currentPatternId = null;
+        state.currentPattern = null;
+        
+        const patternSelect = document.getElementById('pattern-select');
+        const startButton = document.getElementById('start-button');
+
+        // 清空並重設句型選單
+        patternSelect.innerHTML = '<option value="">請選擇句型...</option>';
+        patternSelect.disabled = true;
+        document.getElementById('question-count').disabled = true;
+        startButton.disabled = true;
+
+        if (state.currentLessonId) {
+            const lesson = LESSON_DATA.find(l => l.id === state.currentLessonId);
+            if (lesson && lesson.patterns.length > 0) {
+                lesson.patterns.forEach(pattern => {
+                    const option = document.createElement('option');
+                    option.value = pattern.id;
+                    option.textContent = pattern.name;
+                    patternSelect.appendChild(option);
+                });
+                patternSelect.disabled = false;
+            }
+        }
+    }
+
+    /**
+     * 處理句型變動
+     */
+    function handlePatternChange(event) {
+        state.currentPatternId = event.target.value;
+        document.getElementById('question-count').disabled = true;
+        document.getElementById('start-button').disabled = true;
+
+        if (state.currentPatternId) {
+            const lesson = LESSON_DATA.find(l => l.id === state.currentLessonId);
+            if (lesson) {
+                state.currentPattern = lesson.patterns.find(p => p.id === state.currentPatternId);
+                // 題數和開始按鈕啟用
+                document.getElementById('question-count').disabled = false;
+                document.getElementById('start-button').disabled = false;
+                state.questionCount = parseInt(document.getElementById('question-count').value || 2);
+                document.getElementById('question-count').addEventListener('change', (e) => {
+                    state.questionCount = parseInt(e.target.value);
+                });
+            }
+        } else {
+            state.currentPattern = null;
+        }
+    }
+
+    /**
+     * 載入特定題目的 UI 元素
+     * @param {number} index - 題目在 questions 陣列中的索引
+     */
+    function loadQuestion(index) {
+        const currentQuestion = state.questions[index];
+        
+        // 1. 更新計數器
+        document.getElementById('question-counter').textContent = `第 ${index + 1}/${state.questions.length} 題`;
+
+        // 2. 更新句型結構和說明
+        document.getElementById('pattern-structure').textContent = state.currentPattern.structure.replace(/\+/g, ' + ');
+        document.getElementById('pattern-description').textContent = state.currentPattern.desc;
+
+        // 3. 設定正確答案陣列
+        state.currentCorrectWords = currentQuestion.words;
+
+        // 4. 清空並重設狀態
+        state.userAnswerWords = [];
+        clearDropArea(false); // 清除拖曳區
+
+        // 5. 填充語詞銀行 (Word Bank) - 這次填充的是例句的語詞塊
+        const wordBank = document.getElementById('word-bank');
+        wordBank.innerHTML = '';
+        
+        // 打亂語詞順序
+        const shuffledWords = [...state.currentCorrectWords].sort(() => Math.random() - 0.5);
+
+        shuffledWords.forEach((word, i) => {
+            // 使用 word + 索引作為 dataset ID，避免相同詞語被當作同一個元素處理
+            const wordElement = createWordElement(word, `${word}-${i}`);
+            wordBank.appendChild(wordElement);
+        });
+
+        // 6. 重設按鈕和回饋區
+        document.getElementById('submit-next-button').textContent = '送出答案';
+        document.getElementById('submit-next-button').classList.remove('bg-blue-600', 'hover:bg-blue-700');
+        document.getElementById('submit-next-button').classList.add('bg-green-600', 'hover:bg-green-700');
+        document.getElementById('feedback-area').textContent = '';
+        document.getElementById('word-bank').style.pointerEvents = 'auto';
+        document.getElementById('drop-area').style.pointerEvents = 'auto';
+        document.getElementById('clear-button').disabled = false;
+    }
+
+    /**
+     * 建立語詞按鈕元素
+     * @param {string} word - 語詞內容
+     * @param {string} uniqueId - 唯一 ID
+     * @returns {HTMLElement}
+     */
+    function createWordElement(word, uniqueId) {
+        const element = document.createElement('span');
+        element.textContent = word;
+        // 調整樣式以符合語詞塊
+        element.className = 'draggable cursor-pointer word-token text-base font-semibold py-3 px-4 rounded-lg shadow-md transition duration-150 hover:shadow-lg';
+        element.dataset.word = word;
+        element.dataset.uniqueId = uniqueId; 
+        return element;
+    }
+
+    // --------------------------------------------------
+    // 4. 語詞互動邏輯 (Word Interaction)
+    // --------------------------------------------------
+
+    /**
+     * 處理語詞銀行點擊事件 (將語詞移動到拖曳區)
+     */
+    function handleWordClick(event) {
+        const target = event.target;
+        if (target.classList.contains('draggable') && target.parentElement.id === 'word-bank') {
+            const word = target.dataset.word;
+            
+            // 1. 將語詞加入使用者答案陣列
+            state.userAnswerWords.push(word);
+
+            // 2. 將元素移動到拖曳區
+            const dropArea = document.getElementById('drop-area');
+            
+            // 複製並更新樣式
+            const newElement = createWordElement(word, target.dataset.uniqueId);
+            newElement.classList.remove('word-token', 'hover:shadow-lg');
+            newElement.classList.add('bg-blue-500', 'text-white', 'hover:bg-blue-600', 'shadow-xl');
+            
+            dropArea.appendChild(newElement);
+
+            // 3. 從語詞銀行移除
+            target.remove();
+
+            // 4. 移除放置區的提示文字
+            if (dropArea.querySelector('.text-gray-500')) {
+                dropArea.querySelector('.text-gray-500').remove();
+            }
+        }
+    }
+
+    /**
+     * 處理拖曳區點擊事件 (將語詞移回語詞銀行)
+     */
+    function handleDropAreaClick(event) {
+        const target = event.target;
+        if (target.classList.contains('draggable') && target.parentElement.id === 'drop-area') {
+            const word = target.dataset.word;
+            const uniqueId = target.dataset.uniqueId;
+            
+            // 1. 從使用者答案陣列中移除對應的語詞
+            // 必須透過 DOM 索引找到並移除 userAnswerWords 中對應的項目
+            const clickedIndex = Array.from(target.parentElement.children).indexOf(target);
+            if (clickedIndex !== -1 && clickedIndex < state.userAnswerWords.length) {
+                state.userAnswerWords.splice(clickedIndex, 1);
+            }
+
+            // 2. 將元素移回語詞銀行
+            const newElement = createWordElement(word, uniqueId);
+            newElement.classList.remove('bg-blue-500', 'text-white', 'hover:bg-blue-600', 'shadow-xl'); 
+            newElement.classList.add('word-token', 'hover:shadow-lg');
+            
+            document.getElementById('word-bank').appendChild(newElement);
+            
+            // 3. 從拖曳區移除
+            target.remove();
+
+            // 4. 如果拖曳區空了，顯示提示文字
+            if (document.getElementById('drop-area').children.length === 0) {
+                const placeholder = document.createElement('span');
+                placeholder.className = 'text-gray-500';
+                placeholder.textContent = '請依正確順序排列語詞';
+                document.getElementById('drop-area').appendChild(placeholder);
+            }
+        }
+    }
+
+    /**
+     * 清空拖曳區，將所有語詞移回語詞銀行
+     * @param {boolean} resetAnswer - 是否重設使用者答案陣列 (預設為 true)
+     */
+    function clearDropArea(resetAnswer = true) {
+        const dropArea = document.getElementById('drop-area');
+        const wordBank = document.getElementById('word-bank');
+
+        // 將拖曳區的所有語詞移回語詞銀行
+        Array.from(dropArea.children).forEach(child => {
+            if (child.classList.contains('draggable')) {
+                const newElement = createWordElement(child.dataset.word, child.dataset.uniqueId);
+                newElement.classList.remove('bg-blue-500', 'text-white', 'hover:bg-blue-600', 'shadow-xl');
+                newElement.classList.add('word-token', 'hover:shadow-lg');
+                wordBank.appendChild(newElement);
+                child.remove();
+            }
+        });
+
+        // 重新顯示提示文字
+        dropArea.innerHTML = '<span class="text-gray-500">請依正確順序排列語詞</span>';
+        
+        if (resetAnswer) {
+            state.userAnswerWords = [];
+            // 重設按鈕狀態
+            document.getElementById('submit-next-button').textContent = '送出答案';
+            document.getElementById('submit-next-button').classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            document.getElementById('submit-next-button').classList.add('bg-green-600', 'hover:bg-green-700');
+            document.getElementById('feedback-area').textContent = '';
+            document.getElementById('word-bank').style.pointerEvents = 'auto';
+            document.getElementById('drop-area').style.pointerEvents = 'auto';
+            document.getElementById('clear-button').disabled = false;
+        }
+    }
+
+    // --------------------------------------------------
+    // 5. 答案檢查與結果 (Answer Check & Results)
+    // --------------------------------------------------
+
+    /**
+     * 檢查使用者答案
+     */
+    function checkAnswer() {
+        const currentQuestion = state.questions[state.currentQuestionIndex];
+        const correctSentence = currentQuestion.sentence; // 完整的正確句子
+        const userAnswerSentence = state.userAnswerWords.join(''); // 使用者排列的語詞組成的句子
+        
+        const feedbackArea = document.getElementById('feedback-area');
+        let isCorrect = false;
+
+        // 比較答案
+        if (userAnswerSentence === correctSentence) {
+            isCorrect = true;
+            feedbackArea.textContent = '✅ 排列正確！';
+            feedbackArea.classList.remove('text-red-500');
+            feedbackArea.classList.add('text-green-500');
+            state.score++;
+        } else {
+            isCorrect = false;
+            feedbackArea.textContent = '❌ 排列不正確，請再試一次！';
+            feedbackArea.classList.remove('text-green-500');
+            feedbackArea.classList.add('text-red-500');
+        }
+
+        // 播放語音
+        playTTS(correctSentence);
+        state.review.push({
+            sentence: correctSentence, 
+            correctWords: currentQuestion.words.join('、'),
+            userAnswerWords: state.userAnswerWords.join('、'),
+            correct: isCorrect
+        });
+
+        // 禁用語詞區，防止修改
+        document.getElementById('word-bank').style.pointerEvents = 'none';
+        document.getElementById('drop-area').style.pointerEvents = 'none';
+        document.getElementById('clear-button').disabled = true;
+
+        // 如果答案不正確，顯示正確答案
+        if (!isCorrect) {
+             // 突出顯示正確答案
+            const dropArea = document.getElementById('drop-area');
+            dropArea.innerHTML = ''; // 清空使用者答案
+            currentQuestion.words.forEach((word, i) => {
+                const element = createWordElement(word, `correct-${i}`);
+                element.classList.remove('word-token', 'hover:shadow-lg');
+                element.classList.add('bg-red-500', 'text-white', 'border-red-600', 'shadow-xl');
+                dropArea.appendChild(element);
+            });
+        }
+    }
+
+    /**
+     * 顯示結果頁面
+     */
+    function showResultPage() {
+        showPage('result-page');
+
+        document.getElementById('final-score').textContent = `您答對了 ${state.score} 題，總共 ${state.questions.length} 題。`;
+        
+        const reviewList = document.getElementById('review-list');
+        reviewList.innerHTML = '';
+
+        state.review.forEach((item, index) => {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `p-3 rounded-lg border ${item.correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`;
+            
+            let statusIcon = item.correct ? '✅' : '❌';
+            let statusText = item.correct ? '正確' : '錯誤';
+
+            resultDiv.innerHTML = `
+                <div class="flex justify-between items-center font-bold text-gray-700 mb-1">
+                    <span>第 ${index + 1} 題：${statusIcon} ${statusText}</span>
+                    <button class="play-audio-btn bg-blue-500 text-white text-xs py-1 px-3 rounded-full hover:bg-blue-600 transition" data-sentence="${item.sentence}">
+                        播放語音
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mb-1"><strong>完整句子：</strong> <span class="text-indigo-700 font-medium">${item.sentence}</span></p>
+                <p class="text-sm text-gray-600"><strong>正確語詞：</strong> <span class="text-green-700 font-mono text-xs p-1 bg-green-100 rounded">${item.correctWords}</span></p>
+                <p class="text-sm ${item.correct ? 'text-green-700' : 'text-red-700'}"><strong>您的排列：</strong> <span class="text-xs font-mono p-1 rounded ${item.correct ? 'bg-green-100' : 'bg-red-100'}">${item.userAnswerWords}</span></p>
+            `;
+            reviewList.appendChild(resultDiv);
+        });
+
+        // 重新綁定播放按鈕事件
+        document.querySelectorAll('.play-audio-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                playTTS(e.target.dataset.sentence);
+            });
+        });
+    }
+
+
+    // --------------------------------------------------
+    // 6. 工具函式 (Utility Functions)
+    // --------------------------------------------------
+    
+    /**
+     * 從例句中選出指定數量的題目
+     * @param {Array<Object>} examples - 句型的所有例句物件 {sentence: string, words: Array<string>}
+     * @param {number} count - 題目數量
+     * @returns {Array<Object>} - 隨機選擇的題目物件
+     */
+    function generateQuestions(examples, count) {
+        // 使用 Fisher-Yates 演算法進行亂序
+        const shuffled = [...examples];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled.slice(0, count);
+    }
+
+    /**
+     * 將 Base64 編碼的 PCM 數據轉換為 ArrayBuffer
+     * @param {string} base64 - Base64 編碼的音頻數據
+     * @returns {ArrayBuffer}
+     */
+    function base64ToArrayBuffer(base64) {
+        const binaryString = atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    /**
+     * 將 PCM16 數據轉換為 WAV 格式的 Blob
+     * @param {Int16Array} pcm16 - 16 位簽名 PCM 數據
+     * @param {number} sampleRate - 採樣率
+     * @returns {Blob}
+     */
+    function pcmToWav(pcm16, sampleRate) {
+        const numChannels = 1;
+        const bitsPerSample = 16;
+        const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+        const blockAlign = numChannels * (bitsPerSample / 8);
+        const dataLength = pcm16.length * 2; // 16-bit PCM is 2 bytes per sample
+
+        const buffer = new ArrayBuffer(44 + dataLength);
+        const view = new DataView(buffer);
+        let offset = 0;
+
+        function writeString(str) {
+            for (let i = 0; i < str.length; i++) {
+                view.setUint8(offset++, str.charCodeAt(i));
+            }
+        }
+
+        // RIFF chunk
+        writeString('RIFF');
+        view.setUint32(offset, 36 + dataLength, true); offset += 4;
+        writeString('WAVE');
+
+        // FMT chunk
+        writeString('fmt ');
+        view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size (16 for PCM)
+        view.setUint16(offset, 1, true); offset += 2; // Audio format (1 for PCM)
+        view.setUint16(offset, numChannels, true); offset += 2;
+        view.setUint32(offset, sampleRate, true); offset += 4;
+        view.setUint32(offset, byteRate, true); offset += 4;
+        view.setUint16(offset, blockAlign, true); offset += 2;
+        view.setUint16(offset, bitsPerSample, true); offset += 2;
+
+        // DATA chunk
+        writeString('data');
+        view.setUint32(offset, dataLength, true); offset += 4;
+
+        // Write PCM data
+        for (let i = 0; i < pcm16.length; i++) {
+            view.setInt16(offset, pcm16[i], true); offset += 2;
+        }
+
+        return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    /**
+     * 播放 TTS 語音
+     * @param {string} text - 要轉換成語音的文字
+     */
+    async function playTTS(text) {
+        const audio = document.getElementById('tts-audio');
+        if (audio.src) {
+            audio.pause();
+            audio.src = '';
+        }
+        
+        try {
+            // 1. 構建 API 請求 payload
+            const payload = {
+                contents: [{
+                    parts: [{ text: text }]
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: ttsVoice }
+                        }
+                    }
+                },
+                model: ttsModel
+            };
+
+            // 2. 呼叫 TTS API (包含指數退避重試邏輯)
+            let response;
+            for (let i = 0; i < 3; i++) { // 最多重試 3 次
+                response = await fetch(ttsApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) break;
+
+                // 如果失敗，等待並重試 (指數退避)
+                const delay = Math.pow(2, i) * 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+
+            if (!response || !response.ok) {
+                throw new Error("TTS API 呼叫失敗，請檢查 API 金鑰或網路。");
+            }
+            
+            const result = await response.json();
+            const part = result?.candidates?.[0]?.content?.parts?.[0];
+            const audioData = part?.inlineData?.data;
+            const mimeType = part?.inlineData?.mimeType;
+
+            if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                // 3. 從 mimeType 提取採樣率 (例如: audio/L16;rate=24000)
+                const rateMatch = mimeType.match(/rate=(\d+)/);
+                const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000; // 預設 24000
+                
+                // 4. 轉換 Base64 PCM 數據
+                const pcmData = base64ToArrayBuffer(audioData);
+                const pcm16 = new Int16Array(pcmData);
+
+                // 5. 轉換為 WAV Blob
+                const wavBlob = pcmToWav(pcm16, sampleRate);
+                
+                // 6. 播放音頻
+                audio.src = URL.createObjectURL(wavBlob);
+                audio.play();
+            } else {
+                throw new Error("TTS API 回應中未找到音頻數據。");
+            }
+
+        } catch (error) {
+            console.error("播放語音時發生錯誤:", error);
+            document.getElementById('feedback-area').textContent = '⚠️ 語音播放失敗。';
+            document.getElementById('feedback-area').classList.remove('text-green-500');
+            document.getElementById('feedback-area').classList.add('text-red-500');
+        }
+    }
+</script>
+</body>
+</html>
